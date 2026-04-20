@@ -15,152 +15,346 @@
   <body>
     <main class="shell">
       <section class="hero card">
-        <p class="eyebrow">MiniMax Voice Clone</p>
-        <h1>10 分钟搭起来的音色快速复刻 MVP</h1>
+        <p class="eyebrow">MiniMax Voice Stack</p>
+        <h1>复刻音色，然后直接做正式语音合成</h1>
         <p class="lead">
-          上传复刻音频，可选补充示例音频与试听文本，服务端会先调用文件上传接口，再调用
-          `POST /v1/voice_clone`。
+          这个 MVP 现在包含两段闭环：先上传音频拿到复刻后的 `voice_id`，再用这个 `voice_id`
+          走 `POST /v1/t2a_v2` 做正式语音合成。
         </p>
         <div class="hero-meta">
-          <span>主音频：10 秒 - 5 分钟</span>
-          <span>示例音频：小于 8 秒</span>
-          <span>单文件上限：20MB</span>
+          <span>步骤 1：音色快速复刻</span>
+          <span>步骤 2：正式语音合成</span>
+          <span>服务端代理，前端不暴露 API Key</span>
         </div>
       </section>
 
-      <section class="grid">
-        <form id="clone-form" class="card form-panel">
-          <div class="section-title">
-            <h2>1. 上传素材</h2>
-            <p>前端先做基础校验，真正鉴权与调用在服务端完成。</p>
-          </div>
+      <section class="stack-block">
+        <div class="stack-header">
+          <p class="eyebrow">Step 1</p>
+          <h2>音色快速复刻</h2>
+        </div>
+        <section class="grid">
+          <form id="clone-form" class="card form-panel">
+            <div class="section-title">
+              <h2>上传素材</h2>
+              <p>前端先做基础校验，真正鉴权与调用在服务端完成。</p>
+            </div>
 
-          <label class="field">
-            <span>复刻音频 *</span>
-            <input type="file" name="cloneAudio" accept=".mp3,.m4a,.wav,audio/*" required />
-            <small>建议上传人声清晰、背景噪声少的 10 秒以上音频。</small>
-            <em data-file-meta="cloneAudio"></em>
-          </label>
-
-          <label class="field">
-            <span>示例音频（可选）</span>
-            <input type="file" name="promptAudio" accept=".mp3,.m4a,.wav,audio/*" />
-            <small>小于 8 秒，有助于提高相似度与稳定性。</small>
-            <em data-file-meta="promptAudio"></em>
-          </label>
-
-          <label class="field">
-            <span>示例音频文本（可选）</span>
-            <textarea name="promptText" rows="3" placeholder="和示例音频内容一致，句末带标点。"></textarea>
-          </label>
-
-          <div class="section-title compact">
-            <h2>2. 配置参数</h2>
-          </div>
-
-          <div class="two-col">
             <label class="field">
-              <span>voice_id（留空自动生成）</span>
-              <input type="text" name="voiceId" placeholder="例如 MiniMax001 或 MyVoice_2026" />
+              <span>复刻音频 *</span>
+              <input type="file" name="cloneAudio" accept=".mp3,.m4a,.wav,audio/*" required />
+              <small>建议上传人声清晰、背景噪声少的 10 秒以上音频。</small>
+              <em data-file-meta="cloneAudio"></em>
             </label>
 
             <label class="field">
-              <span>language_boost</span>
-              <select name="languageBoost">
-                <option value="">默认</option>
-                <option value="auto">auto</option>
-                <option value="Chinese">Chinese</option>
-                <option value="Chinese,Yue">Chinese,Yue</option>
-                <option value="English">English</option>
-                <option value="Japanese">Japanese</option>
-                <option value="Korean">Korean</option>
-                <option value="Spanish">Spanish</option>
-                <option value="French">French</option>
-                <option value="German">German</option>
+              <span>示例音频（可选）</span>
+              <input type="file" name="promptAudio" accept=".mp3,.m4a,.wav,audio/*" />
+              <small>小于 8 秒，有助于提高相似度与稳定性。</small>
+              <em data-file-meta="promptAudio"></em>
+            </label>
+
+            <label class="field">
+              <span>示例音频文本（可选）</span>
+              <textarea name="promptText" rows="3" placeholder="和示例音频内容一致，句末带标点。"></textarea>
+            </label>
+
+            <div class="section-title compact">
+              <h2>复刻参数</h2>
+            </div>
+
+            <div class="two-col">
+              <label class="field">
+                <span>voice_id（留空自动生成）</span>
+                <input type="text" name="voiceId" placeholder="例如 MiniMax001 或 MyVoice_2026" />
+              </label>
+
+              <label class="field">
+                <span>language_boost</span>
+                <select name="languageBoost">
+                  <option value="">默认</option>
+                  <option value="auto">auto</option>
+                  <option value="Chinese">Chinese</option>
+                  <option value="Chinese,Yue">Chinese,Yue</option>
+                  <option value="English">English</option>
+                  <option value="Japanese">Japanese</option>
+                  <option value="Korean">Korean</option>
+                  <option value="Spanish">Spanish</option>
+                  <option value="French">French</option>
+                  <option value="German">German</option>
+                </select>
+              </label>
+            </div>
+
+            <label class="field">
+              <span>试听文本（可选）</span>
+              <textarea
+                name="text"
+                rows="4"
+                maxlength="1000"
+                placeholder="填写后会直接返回 demo_audio 试听链接。"
+              ></textarea>
+            </label>
+
+            <label class="field">
+              <span>试听模型</span>
+              <select name="model">
+                <option value="">不生成试听</option>
+                <option value="speech-2.8-hd">speech-2.8-hd</option>
+                <option value="speech-2.8-turbo">speech-2.8-turbo</option>
+                <option value="speech-2.6-hd">speech-2.6-hd</option>
+                <option value="speech-2.6-turbo">speech-2.6-turbo</option>
+                <option value="speech-02-hd">speech-02-hd</option>
+                <option value="speech-02-turbo">speech-02-turbo</option>
+                <option value="speech-01-hd">speech-01-hd</option>
+                <option value="speech-01-turbo">speech-01-turbo</option>
               </select>
             </label>
-          </div>
 
-          <label class="field">
-            <span>试听文本（可选）</span>
-            <textarea
-              name="text"
-              rows="4"
-              maxlength="1000"
-              placeholder="填写后会直接返回 demo_audio 试听链接。"
-            ></textarea>
-          </label>
-
-          <label class="field">
-            <span>试听模型</span>
-            <select name="model">
-              <option value="">不生成试听</option>
-              <option value="speech-2.8-hd">speech-2.8-hd</option>
-              <option value="speech-2.8-turbo">speech-2.8-turbo</option>
-              <option value="speech-2.6-hd">speech-2.6-hd</option>
-              <option value="speech-2.6-turbo">speech-2.6-turbo</option>
-              <option value="speech-02-hd">speech-02-hd</option>
-              <option value="speech-02-turbo">speech-02-turbo</option>
-              <option value="speech-01-hd">speech-01-hd</option>
-              <option value="speech-01-turbo">speech-01-turbo</option>
-            </select>
-          </label>
-
-          <div class="toggle-group">
-            <label><input type="checkbox" name="needNoiseReduction" /> 开启降噪</label>
-            <label><input type="checkbox" name="needVolumeNormalization" /> 音量归一化</label>
-            <label><input type="checkbox" name="aigcWatermark" /> 试听音频加水印</label>
-          </div>
-
-          <button type="submit" class="submit-btn">开始复刻</button>
-          <p id="form-status" class="status"></p>
-        </form>
-
-        <aside class="card result-panel">
-          <div class="section-title">
-            <h2>3. 返回结果</h2>
-            <p>展示请求参数、返回状态、试听音频和原始 JSON。</p>
-          </div>
-
-          <div id="result-empty" class="empty-state">
-            <p>还没开始请求。</p>
-            <span>成功后会在这里看到 `voice_id`、上传 file_id 和试听音频。</span>
-          </div>
-
-          <div id="result-content" class="hidden">
-            <div class="result-head">
-              <span id="result-badge" class="badge">等待中</span>
-              <strong id="result-voice-id">-</strong>
+            <div class="toggle-group">
+              <label><input type="checkbox" name="needNoiseReduction" /> 开启降噪</label>
+              <label><input type="checkbox" name="needVolumeNormalization" /> 音量归一化</label>
+              <label><input type="checkbox" name="aigcWatermark" /> 试听音频加水印</label>
             </div>
-            <dl class="fact-list">
-              <div>
-                <dt>主音频 file_id</dt>
-                <dd id="clone-file-id">-</dd>
-              </div>
-              <div>
-                <dt>示例音频 file_id</dt>
-                <dd id="prompt-file-id">-</dd>
-              </div>
-              <div>
-                <dt>状态码</dt>
-                <dd id="status-code">-</dd>
-              </div>
-              <div>
-                <dt>状态信息</dt>
-                <dd id="status-msg">-</dd>
-              </div>
-            </dl>
-            <div id="sensitive-box" class="note-box"></div>
-            <div id="audio-box" class="audio-box hidden">
-              <audio id="demo-audio" controls></audio>
-              <a id="demo-audio-link" href="#" target="_blank" rel="noreferrer">打开试听音频</a>
+
+            <button type="submit" class="submit-btn">开始复刻</button>
+            <p id="form-status" class="status"></p>
+          </form>
+
+          <aside class="card result-panel">
+            <div class="section-title">
+              <h2>复刻结果</h2>
+              <p>展示请求参数、返回状态、试听音频和原始 JSON。</p>
             </div>
-            <details class="raw-box">
-              <summary>查看原始返回 JSON</summary>
-              <pre id="raw-json"></pre>
-            </details>
-          </div>
-        </aside>
+
+            <div id="result-empty" class="empty-state">
+              <p>还没开始请求。</p>
+              <span>成功后会在这里看到 `voice_id`、上传 file_id 和试听音频。</span>
+            </div>
+
+            <div id="result-content" class="hidden">
+              <div class="result-head">
+                <span id="result-badge" class="badge">等待中</span>
+                <strong id="result-voice-id">-</strong>
+              </div>
+              <dl class="fact-list">
+                <div>
+                  <dt>主音频 file_id</dt>
+                  <dd id="clone-file-id">-</dd>
+                </div>
+                <div>
+                  <dt>示例音频 file_id</dt>
+                  <dd id="prompt-file-id">-</dd>
+                </div>
+                <div>
+                  <dt>状态码</dt>
+                  <dd id="status-code">-</dd>
+                </div>
+                <div>
+                  <dt>状态信息</dt>
+                  <dd id="status-msg">-</dd>
+                </div>
+              </dl>
+              <div id="sensitive-box" class="note-box"></div>
+              <div id="audio-box" class="audio-box hidden">
+                <audio id="demo-audio" controls></audio>
+                <a id="demo-audio-link" href="#" target="_blank" rel="noreferrer">打开试听音频</a>
+              </div>
+              <details class="raw-box">
+                <summary>查看原始返回 JSON</summary>
+                <pre id="raw-json"></pre>
+              </details>
+            </div>
+          </aside>
+        </section>
+      </section>
+
+      <section class="stack-block">
+        <div class="stack-header">
+          <p class="eyebrow">Step 2</p>
+          <h2>正式语音合成</h2>
+        </div>
+        <section class="grid">
+          <form id="tts-form" class="card form-panel">
+            <div class="section-title">
+              <h2>合成参数</h2>
+              <p>用系统音色或刚复刻出来的 `voice_id` 直接生成正式音频。</p>
+            </div>
+
+            <label class="field">
+              <span>voice_id *</span>
+              <div class="inline-action">
+                <input type="text" name="voiceId" id="tts-voice-id" placeholder="填系统音色或复刻后的 voice_id" required />
+                <button type="button" id="use-cloned-voice" class="ghost-btn">使用刚生成的 voice_id</button>
+              </div>
+            </label>
+
+            <label class="field">
+              <span>合成文本 *</span>
+              <textarea name="text" rows="6" maxlength="9999" placeholder="例如：你好，这是一段正式语音合成示例。" required></textarea>
+              <small>官方要求小于 10000 字符；若超过 3000 字符，更推荐流式方式。</small>
+            </label>
+
+            <div class="two-col">
+              <label class="field">
+                <span>模型 *</span>
+                <select name="model" required>
+                  <option value="speech-2.8-hd">speech-2.8-hd</option>
+                  <option value="speech-2.8-turbo">speech-2.8-turbo</option>
+                  <option value="speech-2.6-hd">speech-2.6-hd</option>
+                  <option value="speech-2.6-turbo">speech-2.6-turbo</option>
+                  <option value="speech-02-hd">speech-02-hd</option>
+                  <option value="speech-02-turbo">speech-02-turbo</option>
+                  <option value="speech-01-hd">speech-01-hd</option>
+                  <option value="speech-01-turbo">speech-01-turbo</option>
+                </select>
+              </label>
+
+              <label class="field">
+                <span>情绪（可选）</span>
+                <select name="emotion">
+                  <option value="">自动</option>
+                  <option value="happy">happy</option>
+                  <option value="sad">sad</option>
+                  <option value="angry">angry</option>
+                  <option value="fearful">fearful</option>
+                  <option value="disgusted">disgusted</option>
+                  <option value="surprised">surprised</option>
+                  <option value="calm">calm</option>
+                  <option value="fluent">fluent</option>
+                  <option value="whisper">whisper</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="three-col">
+              <label class="field">
+                <span>speed</span>
+                <input type="number" name="speed" min="0.5" max="2" step="0.1" value="1" />
+              </label>
+              <label class="field">
+                <span>vol</span>
+                <input type="number" name="vol" min="0.1" max="10" step="0.1" value="1" />
+              </label>
+              <label class="field">
+                <span>pitch</span>
+                <input type="number" name="pitch" min="-12" max="12" step="1" value="0" />
+              </label>
+            </div>
+
+            <div class="three-col">
+              <label class="field">
+                <span>audio format</span>
+                <select name="audioFormat">
+                  <option value="mp3">mp3</option>
+                  <option value="flac">flac</option>
+                  <option value="wav">wav</option>
+                  <option value="pcm">pcm</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>sample rate</span>
+                <select name="sampleRate">
+                  <option value="32000">32000</option>
+                  <option value="44100">44100</option>
+                  <option value="24000">24000</option>
+                  <option value="22050">22050</option>
+                  <option value="16000">16000</option>
+                  <option value="8000">8000</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>channel</span>
+                <select name="channel">
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="two-col">
+              <label class="field">
+                <span>bitrate（仅 mp3）</span>
+                <select name="bitrate">
+                  <option value="128000">128000</option>
+                  <option value="256000">256000</option>
+                  <option value="64000">64000</option>
+                  <option value="32000">32000</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>language_boost</span>
+                <select name="languageBoost">
+                  <option value="">默认</option>
+                  <option value="auto">auto</option>
+                  <option value="Chinese">Chinese</option>
+                  <option value="Chinese,Yue">Chinese,Yue</option>
+                  <option value="English">English</option>
+                  <option value="Japanese">Japanese</option>
+                  <option value="Korean">Korean</option>
+                  <option value="Spanish">Spanish</option>
+                  <option value="French">French</option>
+                  <option value="German">German</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="toggle-group">
+              <label><input type="checkbox" name="textNormalization" /> 文本规范化</label>
+              <label><input type="checkbox" name="subtitleEnable" /> 返回字幕链接</label>
+              <label><input type="checkbox" name="aigcWatermark" /> 音频末尾加水印</label>
+            </div>
+
+            <button type="submit" class="submit-btn">开始正式合成</button>
+            <p id="tts-status" class="status"></p>
+          </form>
+
+          <aside class="card result-panel">
+            <div class="section-title">
+              <h2>合成结果</h2>
+              <p>返回 24 小时有效的音频 URL，并显示字符计费和音频信息。</p>
+            </div>
+
+            <div id="tts-empty" class="empty-state">
+              <p>还没开始正式合成。</p>
+              <span>成功后会在这里看到音频链接、trace_id、计费字符数和字幕链接。</span>
+            </div>
+
+            <div id="tts-content" class="hidden">
+              <div class="result-head">
+                <span id="tts-badge" class="badge">等待中</span>
+                <strong id="tts-trace-id">-</strong>
+              </div>
+              <dl class="fact-list">
+                <div>
+                  <dt>usage_characters</dt>
+                  <dd id="tts-usage">-</dd>
+                </div>
+                <div>
+                  <dt>audio_length</dt>
+                  <dd id="tts-length">-</dd>
+                </div>
+                <div>
+                  <dt>audio_format</dt>
+                  <dd id="tts-format">-</dd>
+                </div>
+                <div>
+                  <dt>status_msg</dt>
+                  <dd id="tts-msg">-</dd>
+                </div>
+              </dl>
+              <div id="tts-audio-box" class="audio-box hidden">
+                <audio id="tts-audio" controls></audio>
+                <a id="tts-audio-link" href="#" target="_blank" rel="noreferrer">打开正式音频</a>
+                <a id="tts-subtitle-link" class="hidden" href="#" target="_blank" rel="noreferrer">打开字幕 JSON</a>
+              </div>
+              <details class="raw-box">
+                <summary>查看原始返回 JSON</summary>
+                <pre id="tts-raw-json"></pre>
+              </details>
+            </div>
+          </aside>
+        </section>
       </section>
     </main>
 

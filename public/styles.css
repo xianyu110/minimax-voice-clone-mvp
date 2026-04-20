@@ -57,11 +57,25 @@ body::before {
   margin-bottom: 24px;
 }
 
+.stack-block {
+  margin-bottom: 28px;
+}
+
+.stack-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 6px 14px;
+}
+
 .eyebrow,
 h1,
+h2,
 .section-title h2,
 .submit-btn,
-.badge {
+.badge,
+.ghost-btn {
   font-family: 'Space Grotesk', sans-serif;
 }
 
@@ -77,11 +91,15 @@ h1 {
   margin: 0;
   font-size: clamp(2.1rem, 5vw, 4.2rem);
   line-height: 0.95;
-  max-width: 12ch;
+  max-width: 14ch;
+}
+
+h2 {
+  margin: 0;
 }
 
 .lead {
-  max-width: 720px;
+  max-width: 760px;
   color: var(--muted);
   font-size: 1rem;
   line-height: 1.75;
@@ -147,6 +165,7 @@ small,
 }
 
 .field input[type='text'],
+.field input[type='number'],
 .field input[type='file'],
 .field textarea,
 .field select {
@@ -171,10 +190,25 @@ small,
   color: var(--accent-dark);
 }
 
-.two-col {
+.two-col,
+.three-col {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
+}
+
+.two-col {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.three-col {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.inline-action {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
 }
 
 .toggle-group {
@@ -194,20 +228,32 @@ small,
   background: rgba(255, 255, 255, 0.6);
 }
 
-.submit-btn {
-  width: 100%;
+.submit-btn,
+.ghost-btn {
   border: 0;
   border-radius: 18px;
   padding: 16px 20px;
   font-size: 1rem;
   font-weight: 700;
   cursor: pointer;
+}
+
+.submit-btn {
+  width: 100%;
   color: #fff8f3;
   background: linear-gradient(120deg, var(--accent-dark), var(--accent));
   box-shadow: 0 16px 32px rgba(138, 49, 23, 0.24);
 }
 
-.submit-btn:disabled {
+.ghost-btn {
+  padding: 13px 16px;
+  color: var(--accent-dark);
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(138, 49, 23, 0.18);
+}
+
+.submit-btn:disabled,
+.ghost-btn:disabled {
   cursor: wait;
   opacity: 0.72;
 }
@@ -328,7 +374,9 @@ small,
 @media (max-width: 920px) {
   .grid,
   .two-col,
-  .fact-list {
+  .three-col,
+  .fact-list,
+  .inline-action {
     grid-template-columns: 1fr;
   }
 
@@ -341,5 +389,10 @@ small,
   .form-panel,
   .result-panel {
     padding: 22px;
+  }
+
+  .stack-header {
+    align-items: start;
+    flex-direction: column;
   }
 }

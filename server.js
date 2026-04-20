@@ -7,6 +7,7 @@ import {
   buildVoiceCloneRequest,
   MAX_AUDIO_BYTES
 } from './src/voice-clone.js';
+import { buildSpeechPayload } from './src/speech.js';
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -19,6 +20,7 @@ const upload = multer({
   }
 });
 
+app.use(express.json({ limit: '1mb' }));
 app.use(express.static('public'));
 
 app.get('/api/health', (_req, res) => {
@@ -80,15 +82,43 @@ app.post(
         result: cloneResponse
       });
     } catch (error) {
-      const status = error.statusCode || 500;
-      return res.status(status).json({
-        ok: false,
-        error: error.message || '音色复刻请求失败。',
-        details: error.details || null
-      });
+      return handleError(res, error, '音色复刻请求失败。');
     }
   }
 );
+
+app.post('/api/text-to-speech', async (req, res) => {
+  if (!apiKey) {
+    return res.status(500).json({
+      ok: false,
+      error: '服务端缺少 MINIMAX_API_KEY，请先配置环境变量。'
+    });
+  }
+
+  try {
+    const requestBody = buildSpeechPayload(req.body || {});
+    const speechResponse = await fetchJson('https://api.minimaxi.com/v1/t2a_v2', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestBody),
+      signal: AbortSignal.timeout(60_000)
+    });
+
+    const statusCode = speechResponse.base_resp?.status_code;
+    return res.status(statusCode === 0 ? 200 : 502).json({
+      ok: statusCode === 0,
+      request: requestBody,
+      result: speechResponse,
+      audioUrl: speechResponse.data?.audio || null,
+      subtitleUrl: speechResponse.data?.subtitle_file || null
+    });
+  } catch (error) {
+    return handleError(res, error, '正式语音合成请求失败。');
+  }
+});
 
 app.use((error, _req, res, _next) => {
   if (error instanceof multer.MulterError) {
@@ -104,6 +134,15 @@ app.use((error, _req, res, _next) => {
 app.listen(port, () => {
   console.log(`MiniMax voice clone MVP running at http://localhost:${port}`);
 });
+
+function handleError(res, error, fallbackMessage) {
+  const status = error.statusCode || 500;
+  return res.status(status).json({
+    ok: false,
+    error: error.message || fallbackMessage,
+    details: error.details || null
+  });
+}
 
 async function uploadFileToMiniMax(file, purpose, apiKey) {
   const formData = new FormData();
