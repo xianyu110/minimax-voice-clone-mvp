@@ -7,7 +7,7 @@ import {
   buildVoiceCloneRequest,
   MAX_AUDIO_BYTES
 } from './src/voice-clone.js';
-import { buildSpeechPayload } from './src/speech.js';
+import { buildSpeechPayload, buildVoiceListPayload } from './src/speech.js';
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -24,7 +24,35 @@ app.use(express.json({ limit: '1mb' }));
 app.use(express.static('public'));
 
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, hasApiKey: Boolean(apiKey) });
+  res.json({ ok: true, hasApiKey: Boolean(apiKey), mode: 'proxy' });
+});
+
+app.post('/api/voices', async (req, res) => {
+  if (!apiKey) {
+    return res.status(500).json({ ok: false, error: '服务端缺少 MINIMAX_API_KEY，请先配置环境变量。' });
+  }
+
+  try {
+    const requestBody = buildVoiceListPayload(req.body || {});
+    const voiceResponse = await fetchJson('https://api.minimaxi.com/v1/get_voice', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestBody),
+      signal: AbortSignal.timeout(60_000)
+    });
+
+    const statusCode = voiceResponse.base_resp?.status_code;
+    return res.status(statusCode === 0 ? 200 : 502).json({
+      ok: statusCode === 0,
+      request: requestBody,
+      result: voiceResponse
+    });
+  } catch (error) {
+    return handleError(res, error, '音色查询请求失败。');
+  }
 });
 
 app.post(
@@ -35,10 +63,7 @@ app.post(
   ]),
   async (req, res) => {
     if (!apiKey) {
-      return res.status(500).json({
-        ok: false,
-        error: '服务端缺少 MINIMAX_API_KEY，请先配置环境变量。'
-      });
+      return res.status(500).json({ ok: false, error: '服务端缺少 MINIMAX_API_KEY，请先配置环境变量。' });
     }
 
     try {
@@ -89,14 +114,11 @@ app.post(
 
 app.post('/api/text-to-speech', async (req, res) => {
   if (!apiKey) {
-    return res.status(500).json({
-      ok: false,
-      error: '服务端缺少 MINIMAX_API_KEY，请先配置环境变量。'
-    });
+    return res.status(500).json({ ok: false, error: '服务端缺少 MINIMAX_API_KEY，请先配置环境变量。' });
   }
 
   try {
-    const requestBody = buildSpeechPayload(req.body || {});
+    const requestBody = buildSpeechPayload(req.body || {}, { stream: false });
     const speechResponse = await fetchJson('https://api.minimaxi.com/v1/t2a_v2', {
       method: 'POST',
       headers: {
@@ -120,12 +142,69 @@ app.post('/api/text-to-speech', async (req, res) => {
   }
 });
 
+app.post('/api/text-to-speech/stream', async (req, res) => {
+  if (!apiKey) {
+    return res.status(500).json({ ok: false, error: '服务端缺少 MINIMAX_API_KEY，请先配置环境变量。' });
+  }
+
+  try {
+    const requestBody = buildSpeechPayload(req.body || {}, { stream: true });
+    const upstream = await fetch('https://api.minimaxi.com/v1/t2a_v2', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream'
+      },
+      body: JSON.stringify(requestBody),
+      signal: AbortSignal.timeout(120_000)
+    });
+
+    if (!upstream.ok) {
+      const text = await upstream.text();
+      let details;
+      try {
+        details = JSON.parse(text);
+      } catch {
+        details = { raw: text };
+      }
+      const message = details?.base_resp?.status_msg || details?.message || `MiniMax 返回 HTTP ${upstream.status}`;
+      const error = new Error(message);
+      error.statusCode = upstream.status;
+      error.details = details;
+      throw error;
+    }
+
+    res.status(200);
+    res.setHeader('Content-Type', upstream.headers.get('content-type') || 'text/event-stream; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+
+    const reader = upstream.body?.getReader();
+    if (!reader) {
+      throw new Error('上游流式响应为空。');
+    }
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      res.write(Buffer.from(value));
+    }
+
+    res.end();
+  } catch (error) {
+    if (!res.headersSent) {
+      return handleError(res, error, '流式语音合成请求失败。');
+    }
+    res.end();
+  }
+});
+
 app.use((error, _req, res, _next) => {
   if (error instanceof multer.MulterError) {
-    return res.status(400).json({
-      ok: false,
-      error: '上传文件不符合要求，请确认文件大小不超过 20MB。'
-    });
+    return res.status(400).json({ ok: false, error: '上传文件不符合要求，请确认文件大小不超过 20MB。' });
   }
 
   return res.status(500).json({ ok: false, error: error.message || '未知错误' });

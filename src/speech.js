@@ -69,6 +69,7 @@ export const AUDIO_FORMAT_OPTIONS = ['mp3', 'pcm', 'flac', 'wav'];
 export const SAMPLE_RATE_OPTIONS = [8000, 16000, 22050, 24000, 32000, 44100];
 export const BITRATE_OPTIONS = [32000, 64000, 128000, 256000];
 export const CHANNEL_OPTIONS = [1, 2];
+export const VOICE_TYPE_OPTIONS = ['system', 'voice_cloning', 'voice_generation', 'all'];
 
 export function normalizeBoolean(value) {
   return value === true || value === 'true' || value === 'on' || value === '1';
@@ -94,14 +95,25 @@ function assertRange(value, min, max, label, inclusiveMin = true) {
   }
 }
 
-export function buildSpeechPayload(fields) {
-  const voiceId = String(fields.voiceId || '').trim();
+export function buildVoiceListPayload(fields = {}) {
+  const voiceType = String(fields.voiceType || fields.voice_type || 'system').trim() || 'system';
+
+  if (!VOICE_TYPE_OPTIONS.includes(voiceType)) {
+    throw new Error('voice_type 不在 MiniMax 文档允许的范围内。');
+  }
+
+  return { voice_type: voiceType };
+}
+
+export function buildSpeechPayload(fields, options = {}) {
+  const { stream = false } = options;
+  const voiceId = String(fields.voiceId || fields.voice_id || '').trim();
   const text = String(fields.text || '').trim();
   const model = String(fields.model || '').trim();
   const emotion = String(fields.emotion || '').trim();
-  const languageBoost = String(fields.languageBoost || '').trim();
-  const audioFormat = String(fields.audioFormat || 'mp3').trim() || 'mp3';
-  const sampleRate = parseOptionalNumber(fields.sampleRate, 32000);
+  const languageBoost = String(fields.languageBoost || fields.language_boost || '').trim();
+  const audioFormat = String(fields.audioFormat || fields.audio_format || 'mp3').trim() || 'mp3';
+  const sampleRate = parseOptionalNumber(fields.sampleRate || fields.sample_rate, 32000);
   const bitrate = parseOptionalNumber(fields.bitrate, 128000);
   const channel = parseOptionalNumber(fields.channel, 1);
   const speed = parseOptionalNumber(fields.speed, 1);
@@ -136,6 +148,10 @@ export function buildSpeechPayload(fields) {
     throw new Error('audio format 不在 MiniMax 文档允许的范围内。');
   }
 
+  if (stream && audioFormat === 'wav') {
+    throw new Error('流式模式不支持 wav 格式。');
+  }
+
   if (!SAMPLE_RATE_OPTIONS.includes(sampleRate)) {
     throw new Error('sample_rate 不在 MiniMax 文档允许的范围内。');
   }
@@ -159,22 +175,20 @@ export function buildSpeechPayload(fields) {
   const payload = {
     model,
     text,
-    stream: false,
+    stream,
     voice_setting: {
       voice_id: voiceId,
       speed,
       vol,
       pitch,
-      text_normalization: normalizeBoolean(fields.textNormalization)
+      text_normalization: normalizeBoolean(fields.textNormalization || fields.text_normalization)
     },
     audio_setting: {
       sample_rate: sampleRate,
       format: audioFormat,
       channel
     },
-    subtitle_enable: normalizeBoolean(fields.subtitleEnable),
-    output_format: 'url',
-    aigc_watermark: normalizeBoolean(fields.aigcWatermark)
+    subtitle_enable: normalizeBoolean(fields.subtitleEnable || fields.subtitle_enable)
   };
 
   if (audioFormat === 'mp3') {
@@ -187,6 +201,11 @@ export function buildSpeechPayload(fields) {
 
   if (languageBoost) {
     payload.language_boost = languageBoost;
+  }
+
+  if (!stream) {
+    payload.output_format = 'url';
+    payload.aigc_watermark = normalizeBoolean(fields.aigcWatermark || fields.aigc_watermark);
   }
 
   return payload;
