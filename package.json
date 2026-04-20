@@ -1,0 +1,20 @@
+{
+  "name": "minimax-voice-clone-mvp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "MiniMax 音色快速复刻 MVP",
+  "scripts": {
+    "dev": "node --watch server.js",
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "dotenv": "^16.6.1",
+    "express": "^5.1.0",
+    "multer": "^2.0.2"
+  }
+}

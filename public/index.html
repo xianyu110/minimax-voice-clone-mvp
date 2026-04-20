@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MiniMax 音色快速复刻 MVP</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero card">
+        <p class="eyebrow">MiniMax Voice Clone</p>
+        <h1>10 分钟搭起来的音色快速复刻 MVP</h1>
+        <p class="lead">
+          上传复刻音频，可选补充示例音频与试听文本，服务端会先调用文件上传接口，再调用
+          `POST /v1/voice_clone`。
+        </p>
+        <div class="hero-meta">
+          <span>主音频：10 秒 - 5 分钟</span>
+          <span>示例音频：小于 8 秒</span>
+          <span>单文件上限：20MB</span>
+        </div>
+      </section>
+
+      <section class="grid">
+        <form id="clone-form" class="card form-panel">
+          <div class="section-title">
+            <h2>1. 上传素材</h2>
+            <p>前端先做基础校验，真正鉴权与调用在服务端完成。</p>
+          </div>
+
+          <label class="field">
+            <span>复刻音频 *</span>
+            <input type="file" name="cloneAudio" accept=".mp3,.m4a,.wav,audio/*" required />
+            <small>建议上传人声清晰、背景噪声少的 10 秒以上音频。</small>
+            <em data-file-meta="cloneAudio"></em>
+          </label>
+
+          <label class="field">
+            <span>示例音频（可选）</span>
+            <input type="file" name="promptAudio" accept=".mp3,.m4a,.wav,audio/*" />
+            <small>小于 8 秒，有助于提高相似度与稳定性。</small>
+            <em data-file-meta="promptAudio"></em>
+          </label>
+
+          <label class="field">
+            <span>示例音频文本（可选）</span>
+            <textarea name="promptText" rows="3" placeholder="和示例音频内容一致，句末带标点。"></textarea>
+          </label>
+
+          <div class="section-title compact">
+            <h2>2. 配置参数</h2>
+          </div>
+
+          <div class="two-col">
+            <label class="field">
+              <span>voice_id（留空自动生成）</span>
+              <input type="text" name="voiceId" placeholder="例如 MiniMax001 或 MyVoice_2026" />
+            </label>
+
+            <label class="field">
+              <span>language_boost</span>
+              <select name="languageBoost">
+                <option value="">默认</option>
+                <option value="auto">auto</option>
+                <option value="Chinese">Chinese</option>
+                <option value="Chinese,Yue">Chinese,Yue</option>
+                <option value="English">English</option>
+                <option value="Japanese">Japanese</option>
+                <option value="Korean">Korean</option>
+                <option value="Spanish">Spanish</option>
+                <option value="French">French</option>
+                <option value="German">German</option>
+              </select>
+            </label>
+          </div>
+
+          <label class="field">
+            <span>试听文本（可选）</span>
+            <textarea
+              name="text"
+              rows="4"
+              maxlength="1000"
+              placeholder="填写后会直接返回 demo_audio 试听链接。"
+            ></textarea>
+          </label>
+
+          <label class="field">
+            <span>试听模型</span>
+            <select name="model">
+              <option value="">不生成试听</option>
+              <option value="speech-2.8-hd">speech-2.8-hd</option>
+              <option value="speech-2.8-turbo">speech-2.8-turbo</option>
+              <option value="speech-2.6-hd">speech-2.6-hd</option>
+              <option value="speech-2.6-turbo">speech-2.6-turbo</option>
+              <option value="speech-02-hd">speech-02-hd</option>
+              <option value="speech-02-turbo">speech-02-turbo</option>
+              <option value="speech-01-hd">speech-01-hd</option>
+              <option value="speech-01-turbo">speech-01-turbo</option>
+            </select>
+          </label>
+
+          <div class="toggle-group">
+            <label><input type="checkbox" name="needNoiseReduction" /> 开启降噪</label>
+            <label><input type="checkbox" name="needVolumeNormalization" /> 音量归一化</label>
+            <label><input type="checkbox" name="aigcWatermark" /> 试听音频加水印</label>
+          </div>
+
+          <button type="submit" class="submit-btn">开始复刻</button>
+          <p id="form-status" class="status"></p>
+        </form>
+
+        <aside class="card result-panel">
+          <div class="section-title">
+            <h2>3. 返回结果</h2>
+            <p>展示请求参数、返回状态、试听音频和原始 JSON。</p>
+          </div>
+
+          <div id="result-empty" class="empty-state">
+            <p>还没开始请求。</p>
+            <span>成功后会在这里看到 `voice_id`、上传 file_id 和试听音频。</span>
+          </div>
+
+          <div id="result-content" class="hidden">
+            <div class="result-head">
+              <span id="result-badge" class="badge">等待中</span>
+              <strong id="result-voice-id">-</strong>
+            </div>
+            <dl class="fact-list">
+              <div>
+                <dt>主音频 file_id</dt>
+                <dd id="clone-file-id">-</dd>
+              </div>
+              <div>
+                <dt>示例音频 file_id</dt>
+                <dd id="prompt-file-id">-</dd>
+              </div>
+              <div>
+                <dt>状态码</dt>
+                <dd id="status-code">-</dd>
+              </div>
+              <div>
+                <dt>状态信息</dt>
+                <dd id="status-msg">-</dd>
+              </div>
+            </dl>
+            <div id="sensitive-box" class="note-box"></div>
+            <div id="audio-box" class="audio-box hidden">
+              <audio id="demo-audio" controls></audio>
+              <a id="demo-audio-link" href="#" target="_blank" rel="noreferrer">打开试听音频</a>
+            </div>
+            <details class="raw-box">
+              <summary>查看原始返回 JSON</summary>
+              <pre id="raw-json"></pre>
+            </details>
+          </div>
+        </aside>
+      </section>
+    </main>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
